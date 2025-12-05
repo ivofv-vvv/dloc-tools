@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>DLOC Tools – Warehouse</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #020617;
+      color: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .shell {
+      width: 100%;
+      max-width: 480px;
+      background: #020617;
+      border-radius: 18px;
+      border: 1px solid #1f2937;
+      box-shadow: 0 0 30px rgba(0,0,0,0.5);
+      padding: 20px 18px 22px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 18px;
+    }
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #f97316;
+      margin-bottom: 4px;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #9ca3af;
+    }
+    .cards {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 16px;
+    }
+    .card {
+      background: #020617;
+      border-radius: 16px;
+      border: 1px solid #1f2937;
+      padding: 14px 14px 16px;
+    }
+    .card h2 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      color: #e5e7eb;
+    }
+    .card p {
+      margin: 0 0 12px;
+      font-size: 13px;
+      color: #9ca3af;
+    }
+    .card a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-decoration: none;
+      background: #f97316;
+      color: #020617;
+      font-weight: 600;
+      font-size: 14px;
+      padding: 10px 14px;
+      border-radius: 999px;
+    }
+    .card a span.icon {
+      font-size: 16px;
+    }
+    footer {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 11px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="header">
+      <div class="title">DLOC Tools – Warehouse</div>
+      <div class="subtitle">
+        Utilidades internas para guarda en selectivos, pallets y posiciones.<br>
+        Uso operativo – Silcar / Nave 3.
+      </div>
+    </header>
+
+    <div class="cards">
+      <section class="card">
+        <h2>Checker de posiciones vacías</h2>
+        <p>
+          Compara el mapa completo de DLOC vs. las posiciones ocupadas y muestra
+          faltantes globales y por letra. Permite exportar a Excel.
+        </p>
+        <a href="dloc-checker.html">
+          <span class="icon">📊</span>
+          <span>Abrir checker</span>
+        </a>
+      </section>
+
+      <section class="card">
+        <h2>Scanner Pallet → Posición</h2>
+        <p>
+          Escaneá pallet y posición desde el celular, genera lista de asignaciones
+          y exporta un Excel con columnas Pallet / Posición.
+        </p>
+        <a href="scan-pallets.html">
+          <span class="icon">📱</span>
+          <span>Abrir scanner</span>
+        </a>
+      </section>
+    </div>
+
+    <footer>
+      Desarrollado por <strong>Ivo Villarruel</strong> · Warehouse & Development
+    </footer>
+  </div>
+</body>
+</html>

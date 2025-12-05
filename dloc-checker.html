@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>DLOC Checker – Silcar</title>
+
+<!-- Librería para exportar Excel -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+    :root {
+        --bg: #111827;
+        --bg2: #1f2937;
+        --text: #e5e7eb;
+        --accent: #f97316;
+        --border: #374151;
+    }
+
+    .light {
+        --bg: #f3f4f6;
+        --bg2: #ffffff;
+        --text: #111827;
+        --accent: #ea580c;
+        --border: #d1d5db;
+    }
+
+    body {
+        font-family: Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 20px;
+        transition: .25s;
+    }
+    .container {
+        background: var(--bg2);
+        padding: 20px 20px 10px;
+        border-radius: 12px;
+        max-width: 1200px;
+        margin: auto;
+        border: 1px solid var(--border);
+    }
+    h1 {
+        margin-top: 0;
+        color: var(--accent);
+    }
+    textarea {
+        width: 100%;
+        height: 200px;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        font-family: monospace;
+    }
+    button {
+        padding: 10px 20px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        margin-right: 10px;
+        font-weight: bold;
+    }
+    button:hover {
+        opacity: .85;
+    }
+    .btn-reset {
+        background: #6b7280;
+    }
+    .box {
+        margin-top: 20px;
+        background: var(--bg);
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+    }
+    h2, h3 {
+        color: var(--accent);
+        margin-bottom: 10px;
+    }
+    ul {
+        max-height: 180px;
+        overflow-y: auto;
+        padding-left: 18px;
+    }
+    .grid-col {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+    }
+    .toggle-theme {
+        float: right;
+        cursor: pointer;
+        background: var(--border);
+        padding: 6px 14px;
+        border-radius: 6px;
+        color: var(--text);
+        margin-bottom: 10px;
+        font-size: 13px;
+    }
+    footer {
+        margin-top: 16px;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+        font-size: 11px;
+        text-align: center;
+        color: #9ca3af;
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="toggle-theme" onclick="toggleTheme()">🌙 / ☀️ Modo</div>
+
+    <h1>DLOC Checker (3A–3H) – Silcar</h1>
+    <p>Herramienta interna para controlar posiciones en selectivos y detectar huecos por letra (3A–3H).</p>
+
+    <textarea id="input" placeholder="Pegá aquí tus DLOC..."></textarea>
+    <br><br>
+    <button onclick="procesar()">Verificar</button>
+    <button onclick="exportarExcel()">Exportar Excel</button>
+    <button class="btn-reset" onclick="resetApp()">Reset</button>
+
+    <div id="resultados"></div>
+
+    <footer>
+        Desarrollado por <strong>Ivo Villarruel</strong> – Uso interno Warehouse / Guarda – Silcar Logística
+    </footer>
+</div>
+
+<script>
+// ----------------------
+// GENERAR PATRÓN IDEAL
+// ----------------------
+function generarPatron() {
+    const letras = ["A","B","C","D","E","F","G","H"];
+    const rangos = [
+        [11,15],[21,25],[31,35],[41,45],[51,55],[61,65],[71,75],[81,85],[91,95],
+        [101,105],[111,115],[121,125],[131,135],[141,145],[151,155],[161,165],
+        [171,175],[181,185],[191,195],[201,205],[211,215],[221,225],[231,235],
+        [241,245],[251,255],[261,265],[271,275],[281,285],[291,295],[301,305],
+        [311,315],[321,325],[331,335],[341,345],[351,355],[361,365],[371,375],
+        [381,385],[391,395],[401,405],[411,415],[421,425],[431,435],[441,445],
+        [451,455],[461,465],[471,475],[481,485],[491,495],[501,505],[511,515],
+        [521,525]
+    ];
+
+    let ideal = [];
+
+    letras.forEach(letra => {
+        rangos.forEach(r => {
+            for (let n = r[0]; n <= r[1]; n++) {
+                ideal.push(`3${letra}${String(n).padStart(3,'0')}`);
+            }
+        });
+    });
+
+    return ideal;
+}
+
+// ----------------------
+// ESTADO GLOBAL
+// ----------------------
+let ultimoResultado = {
+    faltantes: [],
+    sobrantes: [],
+    faltantesPorLetra: {}
+};
+
+// ----------------------
+// PROCESAR LISTA
+// ----------------------
+function procesar() {
+    const texto = document.getElementById("input").value.trim();
+    if (!texto) {
+        document.getElementById("resultados").innerHTML = "";
+        ultimoResultado = { faltantes: [], sobrantes: [], faltantesPorLetra: {} };
+        return;
+    }
+
+    const ideal = generarPatron();
+    const idealSet = new Set(ideal);
+
+    const lineas = texto.split(/[\r\n]+/)
+                        .map(l => l.trim().toUpperCase())
+                        .filter(l => l && l !== "DLOC");
+
+    const realesSet = new Set(lineas);
+
+    // FALTANTES
+    const faltantes = ideal.filter(c => !realesSet.has(c));
+
+    // SOBRANTES
+    const sobrantes = [...realesSet].filter(c => !idealSet.has(c));
+
+    // FALTANTES POR LETRA
+    const porLetra = {};
+    for (let letra of "ABCDEFGH") {
+        porLetra[letra] = faltantes.filter(f => f.startsWith("3"+letra));
+    }
+
+    ultimoResultado = {
+        faltantes,
+        sobrantes,
+        faltantesPorLetra: porLetra
+    };
+
+    renderizarResultados(ideal.length, realesSet.size, faltantes, sobrantes, porLetra);
+}
+
+// ----------------------
+// MOSTRAR RESULTADOS
+// ----------------------
+function renderizarResultados(totalIdeal, totalReal, faltantes, sobrantes, porLetra) {
+    let html = `
+        <div class="box">
+            <h2>Resumen</h2>
+            <p>Total esperado: <strong>${totalIdeal}</strong></p>
+            <p>Total ingresado (únicos): <strong>${totalReal}</strong></p>
+            <p>Faltantes: <strong>${faltantes.length}</strong></p>
+            <p>Sobrantes: <strong>${sobrantes.length}</strong></p>
+        </div>
+
+        <div class="grid-col">
+    `;
+
+    // FALTANTES POR LETRA
+    for (let letra of "ABCDEFGH") {
+        html += `
+        <div class="box">
+            <h3>Faltantes 3${letra} (${porLetra[letra].length})</h3>
+            ${
+                porLetra[letra].length === 0
+                ? "<p>✔ Sin faltantes</p>"
+                : "<ul>" + porLetra[letra].map(c => `<li>${c}</li>`).join("") + "</ul>"
+            }
+        </div>
+        `;
+    }
+
+    // SOBRANTES
+    html += `
+        <div class="box">
+            <h2>Sobrantes (${sobrantes.length})</h2>
+            ${
+                sobrantes.length === 0
+                ? "<p>✔ No hay posiciones fuera del patrón</p>"
+                : "<ul>" + sobrantes.map(c => `<li>${c}</li>`).join("") + "</ul>"
+            }
+        </div>
+    `;
+
+    html += `</div>`;
+
+    document.getElementById("resultados").innerHTML = html;
+}
+
+// ----------------------
+// EXPORTAR A EXCEL
+// ----------------------
+function exportarExcel() {
+    const wb = XLSX.utils.book_new();
+
+    // FALTANTES (global)
+    const ws1 = XLSX.utils.json_to_sheet(
+        ultimoResultado.faltantes.map(x => ({Faltante: x}))
+    );
+    XLSX.utils.book_append_sheet(wb, ws1, "Faltantes");
+
+    // FALTANTES POR LETRA
+    for (let letra of "ABCDEFGH") {
+        const ws = XLSX.utils.json_to_sheet(
+            ultimoResultado.faltantesPorLetra[letra]?.map(x => ({[`3${letra}`]: x})) || []
+        );
+        XLSX.utils.book_append_sheet(wb, ws, `3${letra}`);
+    }
+
+    // SOBRANTES
+    const ws2 = XLSX.utils.json_to_sheet(
+        ultimoResultado.sobrantes.map(x => ({Sobrante: x}))
+    );
+    XLSX.utils.book_append_sheet(wb, ws2, "Sobrantes");
+
+    XLSX.writeFile(wb, "DLOC_Checker.xlsx");
+}
+
+// ----------------------
+// RESET
+// ----------------------
+function resetApp() {
+    document.getElementById("input").value = "";
+    document.getElementById("resultados").innerHTML = "";
+    ultimoResultado = {
+        faltantes: [],
+        sobrantes: [],
+        faltantesPorLetra: {}
+    };
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// ----------------------
+// MODO OSCURO/CLARO
+// ----------------------
+function toggleTheme() {
+    document.body.classList.toggle("light");
+    localStorage.setItem("theme", document.body.classList.contains("light") ? "light" : "dark");
+}
+
+window.onload = () => {
+    if (localStorage.getItem("theme") === "light") {
+        document.body.classList.add("light");
+    }
+};
+</script>
+
+</body>
+</html>
+

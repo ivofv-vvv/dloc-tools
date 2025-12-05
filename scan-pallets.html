@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Scan Pallets – Silcar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- QR Reader -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <!-- Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #020617;
+      color: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .app {
+      width: 100%;
+      max-width: 480px;
+      background: #020617;
+      border-radius: 18px;
+      border: 1px solid #1f2937;
+      box-shadow: 0 0 30px rgba(0,0,0,0.55);
+      padding: 18px 14px 20px;
+    }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 20px;
+      text-align: center;
+      color: #f97316;
+    }
+    .desc {
+      font-size: 12px;
+      color: #9ca3af;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    .status {
+      font-size: 13px;
+      text-align: center;
+      margin-bottom: 12px;
+      color: #e5e7eb;
+    }
+    .status span {
+      font-weight: 600;
+      color: #f97316;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+    }
+    .btn-main {
+      background: #f97316;
+      color: #020617;
+    }
+    .btn-sec {
+      background: #111827;
+      color: #e5e7eb;
+    }
+    .btn-danger {
+      background: #b91c1c;
+      color: #f9fafb;
+    }
+    .btn-fin {
+      background: #0f172a;
+      color: #facc15;
+      border: 1px solid #1f2937;
+    }
+
+    .cam-wrapper {
+      margin: 10px 0 6px;
+      background: #020617;
+      border-radius: 12px;
+      border: 1px dashed #374151;
+      padding: 8px;
+      display: none; /* oculta por defecto */
+    }
+    video {
+      width: 100%;
+      border-radius: 10px;
+      background: #000;
+    }
+
+    .info-line {
+      font-size: 13px;
+      margin-top: 8px;
+      text-align: center;
+      color: #9ca3af;
+    }
+
+    .pending {
+      margin-top: 10px;
+      font-size: 13px;
+      text-align: center;
+    }
+    .pending span {
+      font-weight: 600;
+      color: #f97316;
+    }
+
+    .list {
+      margin-top: 12px;
+      font-size: 12px;
+      max-height: 180px;
+      overflow-y: auto;
+      border-top: 1px solid #1f2937;
+      padding-top: 8px;
+    }
+    .list table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .list th,
+    .list td {
+      padding: 4px 3px;
+      border-bottom: 1px solid #111827;
+    }
+    .list th {
+      text-align: left;
+      color: #9ca3af;
+      font-weight: 600;
+    }
+    footer {
+      margin-top: 10px;
+      font-size: 10px;
+      text-align: center;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Scan Pallets – Silcar</h1>
+    <p class="desc">
+      Flujo: primero <strong>pallet</strong>, luego <strong>posición DLOC</strong>.<br>
+      La cámara se activa solo cuando lo indicás.
+    </p>
+
+    <p class="status" id="estado">
+      Listo. Elegí qué querés escanear.
+    </p>
+
+    <div class="btn-row">
+      <button class="btn-main" onclick="iniciarEscaneo('pallet')">📦 Escanear pallet</button>
+      <button class="btn-main" onclick="iniciarEscaneo('posicion')">📍 Escanear posición</button>
+      <button class="btn-danger" onclick="resetDatos()">Reset datos</button>
+      <button class="btn-fin" onclick="finalizar()">FIN – Exportar Excel</button>
+    </div>
+
+    <div class="cam-wrapper" id="camWrapper">
+      <video id="video" playsinline></video>
+      <p class="info-line" id="msgScan"></p>
+    </div>
+
+    <div class="pending" id="pendingInfo">
+      Ningún pallet pendiente.
+    </div>
+
+    <div class="list">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Pallet</th>
+            <th>Posición</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyReg">
+          <tr><td colspan="3">Sin registros cargados.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <footer>
+      Desarrollado por <strong>Ivo Villarruel</strong> – Uso interno Warehouse / Guarda – Silcar Logística
+    </footer>
+  </div>
+
+  <canvas id="canvas" style="display:none;"></canvas>
+
+ <script>
+  let video = null;
+  let canvas = null;
+  let ctx = null;
+  let stream = null;
+  let scanLoopId = null;
+
+  let modo = null;          // 'pallet' o 'posicion'
+  let palletPendiente = null;
+  let registros = [];
+
+  function setEstado(texto) {
+    document.getElementById("estado").innerText = texto;
+  }
+
+  function actualizarPendiente() {
+    const el = document.getElementById("pendingInfo");
+    if (!palletPendiente) {
+      el.innerHTML = "Ningún pallet pendiente.";
+    } else {
+      el.innerHTML = "Pallet pendiente: <span>" + palletPendiente + "</span>. Escaneá posición.";
+    }
+  }
+
+  function actualizarTabla() {
+    const tbody = document.getElementById("tbodyReg");
+    if (!registros.length) {
+      tbody.innerHTML = '<tr><td colspan="3">Sin registros cargados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = registros.map((r, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${r.pallet}</td>
+        <td>${r.posicion}</td>
+      </tr>
+    `).join("");
+  }
+
+  async function iniciarCamara() {
+    video = document.getElementById("video");
+    canvas = document.getElementById("canvas");
+    ctx = canvas.getContext("2d");
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      });
+      video.srcObject = stream;
+      await video.play();
+      document.getElementById("camWrapper").style.display = "block";
+      iniciarLoopEscaneo();
+    } catch (e) {
+      console.error(e);
+      setEstado("Error al iniciar cámara: " + e.name);
+    }
+  }
+
+  function detenerCamara() {
+    if (scanLoopId) {
+      cancelAnimationFrame(scanLoopId);
+      scanLoopId = null;
+    }
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    document.getElementById("camWrapper").style.display = "none";
+  }
+
+  function iniciarEscaneo(nuevoModo) {
+    if (nuevoModo === "posicion" && !palletPendiente) {
+      alert("Primero escaneá un pallet.");
+      return;
+    }
+    modo = nuevoModo;
+    const msg = (modo === "pallet")
+      ? "Apuntá al QR del PALLET."
+      : "Apuntá al QR/Código de la POSICIÓN.";
+    document.getElementById("msgScan").innerText = msg;
+    setEstado("Cámara activa – " + (modo === "pallet" ? "escaneando pallet" : "escaneando posición"));
+    iniciarCamara();
+  }
+
+  function iniciarLoopEscaneo() {
+    const scan = () => {
+      if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        scanLoopId = requestAnimationFrame(scan);
+        return;
+      }
+
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (!w || !h) {
+        scanLoopId = requestAnimationFrame(scan);
+        return;
+      }
+
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(video, 0, 0, w, h);
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const code = jsQR(imageData.data, w, h, { inversionAttempts: "dontInvert" });
+
+      if (code) {
+        procesarLectura(code.data);
+        detenerCamara(); 
+        return;
+      }
+
+      scanLoopId = requestAnimationFrame(scan);
+    };
+
+    scanLoopId = requestAnimationFrame(scan);
+  }
+
+  function procesarLectura(texto) {
+    if (!modo) return;
+
+    const limpio = texto.trim();
+
+    if (modo === "pallet") {
+      let soloNumeros = limpio.replace(/\D/g, "");
+
+      // Si querés obligar a 6 dígitos:
+      // soloNumeros = soloNumeros.slice(-6);
+
+      palletPendiente = soloNumeros || limpio;
+
+      setEstado("Pallet leído: " + palletPendiente + ". Ahora escaneá posición.");
+      actualizarPendiente();
+    } 
+    else if (modo === "posicion") {
+      if (!palletPendiente) {
+        setEstado("Se leyó posición, pero no hay pallet pendiente.");
+        return;
+      }
+
+      registros.push({
+        pallet: palletPendiente,
+        posicion: limpio
+      });
+
+      setEstado("Asignación cargada: " + palletPendiente + " → " + limpio);
+      palletPendiente = null;
+      actualizarPendiente();
+      actualizarTabla();
+    }
+
+    modo = null;
+    document.getElementById("msgScan").innerText = "";
+  }
+
+  function resetDatos() {
+    if (!confirm("¿Borrar todos los registros y pallet pendiente?")) return;
+    registros = [];
+    palletPendiente = null;
+    modo = null;
+    detenerCamara();
+    actualizarTabla();
+    actualizarPendiente();
+    setEstado("Reset completo. Listo para empezar de nuevo.");
+  }
+
+  function finalizar() {
+    if (!registros.length) {
+      alert("No hay datos para exportar.");
+      return;
+    }
+
+    const rows = registros.map(r => ({
+      Pallet: r.pallet,
+      Posicion: r.posicion
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, "Pallets_Posiciones");
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+
+    const blob = new Blob([wbout], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Pallet_Posiciones.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+
+    setEstado("Excel generado y descargado.");
+  }
+</script>
